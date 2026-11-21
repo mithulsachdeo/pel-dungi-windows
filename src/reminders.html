@@ -1,0 +1,82 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'">
+<title>Pel Dungi reminders</title>
+<style>
+  @font-face{font-family:Hand;src:url(../web/Caveat-Bold.ttf)}
+  :root{--ink:#2b1a14;--card:#fffaf2;--maroon:#7a1f2b;--cream:#efe5d8;--muted:#7d6a60;--line:#e3d6c6}
+  *{box-sizing:border-box}
+  ::-webkit-scrollbar{width:10px}
+  ::-webkit-scrollbar-thumb{background:#d6c5b2;border-radius:10px;border:3px solid var(--cream)}
+  ::-webkit-scrollbar-track{background:transparent}
+  html,body{margin:0;background:var(--cream);color:var(--ink);font:14px/1.35 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif}
+  main{padding:18px 18px 22px;display:flex;flex-direction:column;gap:14px}
+  h1{font-family:Hand,cursive;font-size:34px;line-height:1;margin:0;color:var(--maroon)}
+  .card{background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:0 1px 0 rgba(43,26,20,.06),0 6px 18px rgba(43,26,20,.08)}
+  label{display:block;font-size:12px;font-weight:700;color:var(--maroon);margin:0 0 4px}
+  .field{margin-bottom:12px}
+  input,select{width:100%;font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;outline:none}
+  input:focus,select:focus{border-color:var(--maroon);box-shadow:0 0 0 3px rgba(122,31,43,.15)}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .error{color:#b3261e;font-weight:600;font-size:13px;min-height:18px;margin:2px 0 8px}
+  .actions{display:flex;flex-direction:column;gap:8px}
+  .pill{font:inherit;font-weight:700;border-radius:999px;padding:9px 16px;cursor:pointer;border:1.5px solid var(--maroon)}
+  .pill.primary{background:var(--maroon);color:#fff}
+  .pill.primary:hover{background:#651823}
+  .pill.secondary{background:transparent;color:var(--maroon)}
+  .pill.secondary:hover{background:rgba(122,31,43,.07)}
+  .pill:focus-visible{outline:3px solid rgba(122,31,43,.35);outline-offset:2px}
+  h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:2px 2px 6px}
+  ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  li{background:var(--card);border-radius:14px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
+  li .body{flex:1;min-width:0}
+  li .text{font-weight:700;overflow-wrap:anywhere}
+  li .meta{font-size:12px;color:var(--muted);margin-top:2px}
+  li.past{opacity:.6}
+  .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-left:6px;background:var(--cream);color:var(--maroon)}
+  .remove{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:8px}
+  .remove:hover{color:var(--maroon);background:var(--cream)}
+  .empty{color:var(--muted);text-align:center;padding:14px;background:var(--card);border-radius:14px}
+</style></head>
+<body>
+<main>
+  <h1>Pel Dungi reminders</h1>
+
+  <form class="card" id="form" autocomplete="off">
+    <div class="field">
+      <label for="text">Reminder</label>
+      <input id="text" maxlength="200" placeholder="Team call in 5 minutes">
+    </div>
+    <div class="field">
+      <label for="at">Remind me</label>
+      <input id="at" type="datetime-local" required>
+    </div>
+    <div class="field">
+      <label for="link">Meeting link (optional)</label>
+      <input id="link" placeholder="https://">
+      <div class="hint">Add a link and she shows a Join meeting button.</div>
+    </div>
+    <div class="field">
+      <label for="style">Style</label>
+      <select id="style">
+        <option value="meeting">Meeting (she drives in by car)</option>
+        <option value="balloon">Balloon (for meetings)</option>
+        <option value="motivation">I need motivation (balloon)</option>
+        <option value="scold">Mujhe daanto (she slides in)</option>
+      </select>
+    </div>
+    <div class="error" id="error" role="alert"></div>
+    <div class="actions">
+      <button class="pill primary" type="submit">Save reminder</button>
+      <button class="pill secondary" type="button" id="preview">See Unnati now, in the style picked above</button>
+    </div>
+  </form>
+
+  <section>
+    <h2>Upcoming and past</h2>
+    <ul id="list"></ul>
+    <div class="empty" id="empty" hidden>No reminders yet</div>
+  </section>
+</main>
+<script src="reminders.js"></script>
+</body></html>

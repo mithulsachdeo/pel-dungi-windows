@@ -1,0 +1,207 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Pel Dungi stage</title>
+<style>
+  @font-face{font-family:Hand;src:url(Caveat-Bold.ttf)}
+  :root{--ink:#2b1a14;--card:#fffaf2;--maroon:#7a1f2b;--cream:#efe5d8}
+  html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:-apple-system,"SF Pro Rounded",system-ui,sans-serif;-webkit-user-select:none;user-select:none}
+  img{-webkit-user-drag:none}
+  .clip{position:fixed;overflow:hidden;pointer-events:none}
+  .girl{position:absolute;cursor:grab;pointer-events:auto}
+  .girl.grab{cursor:grabbing}
+  .card{position:fixed;width:250px;background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.22);color:var(--ink);
+        opacity:0;transform:scale(.6) translateY(10px);transition:.35s cubic-bezier(.3,1.5,.5,1);pointer-events:auto}
+  .card.show{opacity:1;transform:none}
+  .card .who{font-size:12px;font-weight:700;color:var(--maroon)}
+  .card .msg{font-size:17px;font-weight:700;margin:6px 0 10px;line-height:1.25}
+  .card button{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:10px;padding:8px 14px;cursor:pointer;background:var(--maroon);color:#fff}
+  .burst{position:absolute;right:230px;top:10px;width:250px;height:150px;opacity:0;transform:scale(.2) rotate(-12deg);transition:.3s cubic-bezier(.3,1.8,.5,1)}
+  .burst.show{opacity:1;transform:scale(1) rotate(-6deg)}
+  .burst svg{position:absolute;inset:0;width:100%;height:100%}
+  .burst span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900;font-size:30px;line-height:.95;color:var(--maroon);padding:0 30px}
+  .lines{position:absolute;right:40px;top:40px;width:260px;height:260px;opacity:0}
+  .lines.show{animation:pulse .5s ease-out 3}
+  @keyframes pulse{0%{opacity:0;transform:scale(.8)}40%{opacity:1}100%{opacity:0;transform:scale(1.15)}}
+  .shake{animation:shake .45s linear}
+  @keyframes shake{0%,100%{transform:none}20%{transform:translate(-6px,3px)}40%{transform:translate(5px,-4px)}60%{transform:translate(-4px,-2px)}80%{transform:translate(3px,4px)}}
+  #car{position:fixed;height:180px;cursor:pointer;pointer-events:auto}
+  .balloon{position:fixed;width:230px;cursor:pointer;pointer-events:auto;transform-origin:66% 20%}
+  .balloon img{width:100%;display:block}
+  .balloon .say{position:absolute;left:66.5%;top:19%;transform:translate(-50%,-50%) rotate(-6deg);width:58%;text-align:center;font-family:Hand,cursive;font-size:32px;line-height:.95;color:#fff;text-shadow:0 2px 0 rgba(120,20,60,.35)}
+</style></head>
+<body>
+<div id="root"></div>
+<script>
+// ---------- inputs from the app ----------
+const P=new URLSearchParams(location.search);
+const SW=innerWidth, SH=innerHeight;
+const TOP=+P.get('top')||25, BOTTOM=+P.get('bottom')||0;          // menu bar height, dock height (points)
+const TEXT=P.get('text')||'', LINK=P.get('link')||'';
+const WIN=(P.get('win')||'').split(',').map(Number);               // active window x,y,w,h (top-left origin)
+const hasWin=WIN.length===4&&WIN[2]>200&&WIN[3]>150;
+const OUTFITS=['front-knife','outfit-dress','outfit-kurti','outfit-shorts','outfit-pants'];
+const outfit=P.get('outfit')||OUTFITS[Math.floor(Math.random()*OUTFITS.length)];
+let style=P.get('style')||'random';
+// The three modes people can pick (team call, 14 Nov): which scene and which recording each uses.
+// motivation.m4a is made by build.sh from assets/voice/motivation.* (placeholder until the real one comes).
+const MODES={motivation:{scene:'balloon',voice:'motivation',auto:true},
+             scold:{scene:'peek',voice:'scold-full',auto:true},
+             meeting:{scene:'car',voice:'5-chaaku-tumhare-sar-bye'}};
+const mode=MODES[style];if(mode)style=mode.scene;
+const STYLES=['winpeek','peek','shout','car','onwin','balloon'];
+if(style==='random'){const pool=LINK?STYLES:STYLES.filter(s=>s!=='balloon');style=pool[Math.floor(Math.random()*pool.length)]}
+if((style==='winpeek'||style==='onwin')&&!hasWin)style=style==='winpeek'?'peek':'shout';
+if(style==='onwin'&&WIN[1]-TOP<200)style='shout';
+// a window that fills the screen leaves no room beside it to peek from
+if(style==='winpeek'&&Math.max(SW-(WIN[0]+WIN[2]),WIN[0])<170)style='peek';
+const VOICE={winpeek:'0-pel-dungi-main',peek:'0-pel-dungi-main',shout:'2-are-you-mad-fix-it',car:'5-chaaku-tumhare-sar-bye',onwin:'3-aisi-zindagi-pel-dungi',balloon:'1-high-time'};
+const voice=new Audio(`voice/${P.get('voice')||(mode?mode.voice:VOICE[style])}.m4a`);
+
+// ---------- talking to the app ----------
+const post=m=>{try{webkit.messageHandlers.agent.postMessage(m)}catch(e){console.log('post',JSON.stringify(m))}};
+let finished=false;
+function done(){if(finished)return;finished=true;setTimeout(()=>post({type:'done'}),350)}
+function openLink(){if(LINK)post({type:'open',url:LINK})}
+const hitEls=new Set();
+setInterval(()=>{const r=[];hitEls.forEach(el=>{if(!el.isConnected)return;const b=el.getBoundingClientRect();
+  if(b.width>0&&getComputedStyle(el).opacity!=='0')r.push([b.left,b.top,b.width,b.height])});post({type:'hit',rects:r})},80);
+
+// ---------- helpers ----------
+const root=document.getElementById('root');
+const el=(tag,cls,parent=root)=>{const e=document.createElement(tag);if(cls)e.className=cls;parent.appendChild(e);return e};
+const timers=[];const later=(ms,fn)=>timers.push(setTimeout(fn,ms));
+const ease=t=>1-Math.pow(1-t,3);
+const back=t=>{const c=1.7;return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2)};
+function tween(obj,to,ms,fn,apply){const from={};for(const k in to)from[k]=obj[k];const t0=performance.now();
+  const id=setInterval(()=>{const p=Math.min(1,(performance.now()-t0)/ms),e=(fn||ease)(p);for(const k in to)obj[k]=from[k]+(to[k]-from[k])*e;apply();if(p>=1)clearInterval(id)},16);timers.push(id)}
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+
+// the girl: position by right/bottom inside her box, plus spring offsets from dragging
+function makeGirl(parent,height){
+  const img=el('img','girl',parent);img.src=`art/${outfit}.png`;img.style.height=height+'px';
+  const G={x:0,y:0,rot:0,scale:1,origin:'bottom center',side:'right'};const S={r:0,y:0,w:0,t:0};
+  function apply(){img.style.left=img.style.right='';img.style[G.side]=G.x+'px';img.style.bottom=G.y+'px';img.style.transformOrigin=G.origin;
+    img.style.transform=`rotate(${G.rot+S.r}deg) translateY(${S.y}px) scale(${G.scale})`}
+  hitEls.add(img);
+  return {img,G,S,apply,tw:(to,ms,fn)=>tween(G,to,ms,fn,apply)};
+}
+function makeCard(){if(!LINK)return null;const c=el('div','card');c.innerHTML='<div class="who">Meeting</div><div class="msg"></div><button>Join meeting</button>';
+  c.querySelector('.msg').textContent=TEXT||'Meeting time';c.querySelector('button').onclick=()=>{openLink();leave()};hitEls.add(c);return c}
+
+// drag: bend toward the pull and wobble back; a plain click makes her leave
+function draggable(g,{onClick,onFling}){
+  let d=null,spring=null;const {img,S,apply}=g;
+  img.addEventListener('pointerdown',e=>{e.preventDefault();img.setPointerCapture(e.pointerId);clearInterval(spring);d={x:e.clientX,y:e.clientY,moved:false};img.classList.add('grab');post({type:'capture',on:true})});
+  img.addEventListener('pointermove',e=>{if(!d)return;const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.abs(dx)+Math.abs(dy)>5)d.moved=true;
+    S.r=clamp(dx*.25,-40,40);S.y=clamp(dy*.4,-60,60);S.w=S.t=0;apply()});
+  img.addEventListener('pointerup',()=>{if(!d)return;img.classList.remove('grab');post({type:'capture',on:false});const moved=d.moved;d=null;
+    if(!moved){onClick();return}
+    if(onFling&&(Math.abs(S.r)>=25||S.y>=40)){Object.assign(S,{r:0,y:0,w:0,t:0});onFling();return}
+    spring=setInterval(()=>{S.w=(S.w-S.r*.09)*.9;S.r+=S.w;S.t=(S.t-S.y*.12)*.86;S.y+=S.t;apply();
+      if(Math.abs(S.r)+Math.abs(S.w)+Math.abs(S.y)+Math.abs(S.t)<.05){Object.assign(S,{r:0,y:0,w:0,t:0});apply();clearInterval(spring)}},16)});
+}
+let leave=()=>done();
+
+// ---------- the styles ----------
+function topRightBox(){const b=el('div','clip');Object.assign(b.style,{top:TOP+'px',right:'0',width:'620px',height:'440px'});return b}
+
+const scenes={
+  // peeks out from behind the window you are working in
+  winpeek(){
+    const H=280,wx=WIN[0],wy=WIN[1],ww=WIN[2],wh=WIN[3];
+    const roomR=SW-(wx+ww),roomL=wx;const right=roomR>=roomL;
+    const box=el('div','clip');const bh=Math.max(wh,H+80);
+    Object.assign(box.style,right?{left:(wx+ww)+'px',width:roomR+'px'}:{left:'0',width:roomL+'px'});
+    Object.assign(box.style,{top:Math.min(wy,SH-bh)+'px',height:bh+'px'});
+    const g=makeGirl(box,H);const card=makeCard();
+    g.img.onload=()=>{const W=g.img.getBoundingClientRect().width||150;
+      // girl is anchored to the window edge side of the box
+      Object.assign(g.G,{side:right?'left':'right',origin:right?'bottom left':'bottom right',x:-W-10,y:bh-H-40,rot:0});g.apply();
+      const lean=right?1:-1;
+      later(300,()=>g.tw({x:-W*0.55,rot:14*lean},380));
+      later(1100,()=>g.tw({x:-W-10,rot:0},260));
+      later(1700,()=>{g.tw({x:-W*0.42,rot:16*lean},420);voice.play().catch(()=>{})});
+      if(card)later(2200,()=>{const b=g.img.getBoundingClientRect();
+        card.style.top=Math.max(TOP+10,b.top)+'px';
+        if(right)card.style.left=Math.min(SW-260,b.right+10)+'px';else card.style.left=Math.max(10,b.left-260)+'px';card.classList.add('show')});
+      leave=()=>{card&&card.classList.remove('show');g.tw({x:-W-20,rot:0},260);done()};
+    };
+    draggable(g,{onClick:()=>leave()});
+  },
+  // peeks from the right edge of the screen
+  peek(){
+    const box=topRightBox();box.style.top=(TOP+Math.max(0,(SH-TOP-BOTTOM-440)/2))+'px';
+    const g=makeGirl(box,300);const card=makeCard();
+    Object.assign(g.G,{origin:'bottom right',rot:-22,x:-260,y:20});g.apply();
+    later(300,()=>g.tw({x:-170},350));
+    later(1100,()=>g.tw({x:-260},250));
+    later(1700,()=>{g.tw({x:-140},400);voice.play().catch(()=>{})});
+    if(card)later(2200,()=>{const b=g.img.getBoundingClientRect();card.style.top=b.top+40+'px';card.style.left=(SW-380)+'px';card.classList.add('show')});
+    leave=()=>{card&&card.classList.remove('show');g.tw({x:-320},260);done()};
+    draggable(g,{onClick:()=>leave()});
+  },
+  // jumps up, the screen shakes, big comic bubble
+  shout(){
+    const box=topRightBox();
+    const lines=el('div','',box);lines.innerHTML='<svg class="lines" viewBox="0 0 100 100"><g stroke="#7a1f2b" stroke-width="2.4" stroke-linecap="round"><line x1="50" y1="6" x2="50" y2="18"/><line x1="20" y1="16" x2="28" y2="26"/><line x1="80" y1="16" x2="72" y2="26"/><line x1="6" y1="44" x2="18" y2="46"/><line x1="94" y1="44" x2="82" y2="46"/></g></svg>';
+    const g=makeGirl(box,300);
+    const burst=el('div','burst',box);burst.innerHTML='<svg viewBox="0 0 250 150"><polygon fill="#fff" stroke="#2b1a14" stroke-width="4" stroke-linejoin="round" points="125,6 148,30 190,14 186,46 240,48 206,76 244,104 196,108 204,142 158,122 128,146 104,120 56,140 62,106 8,104 44,76 10,46 62,44 58,12 102,30"/></svg><span>ARE YOU MAD?!</span>';
+    const card=makeCard();
+    Object.assign(g.G,{x:20,y:-330});g.apply();
+    later(50,()=>g.tw({y:20},300,back));
+    later(380,()=>{g.tw({scale:1.08},120);box.classList.add('shake');lines.firstChild.classList.add('show');burst.classList.add('show');voice.play().catch(()=>{})});
+    later(560,()=>g.tw({scale:1},250));
+    if(card)later(1700,()=>{card.style.top=(TOP+170)+'px';card.style.left=(SW-560)+'px';card.classList.add('show')});
+    leave=()=>{card&&card.classList.remove('show');burst.classList.remove('show');g.tw({y:-340},300);done()};
+    draggable(g,{onClick:()=>leave()});
+  },
+  // drives in along the bottom and leans out with the knife
+  car(){
+    const car=el('img');car.id='car';car.src='art/car.png';hitEls.add(car);const card=makeCard();
+    let x=SW+40;const y=BOTTOM+8;car.style.bottom=y+'px';
+    const put=bob=>{car.style.left=x+'px';car.style.transform=`translateY(${bob}px)`};put(0);
+    const drive=(to,ms,cb)=>{const from=x,t0=performance.now();const id=setInterval(()=>{const p=Math.min(1,(performance.now()-t0)/ms);x=from+(to-from)*ease(p);put(p<1?Math.sin(performance.now()/60)*2:0);if(p>=1){clearInterval(id);cb&&cb()}},16);timers.push(id)};
+    const stopAt=SW*0.62;
+    drive(stopAt,1800,()=>{car.animate([{transform:'translateY(0) rotate(0)'},{transform:'translateY(-6px) rotate(-1.5deg)'},{transform:'translateY(0)'}],{duration:350});
+      // soft two-beep horn when the car stops (Shivali, 14 Nov: "not irritating"), then her voice
+      const horn=new Audio('voice/horn.m4a');horn.volume=0.6;horn.play().catch(()=>{});
+      later(800,()=>voice.play().catch(()=>{}));
+      if(card)later(400,()=>{card.style.left=(stopAt+40)+'px';card.style.bottom='';card.style.top=(SH-y-180-130)+'px';card.classList.add('show')})});
+    leave=()=>{card&&card.classList.remove('show');drive(-500,1500,done)};
+    car.addEventListener('click',()=>leave());
+  },
+  // drops onto your window's top bar; pull her off and she falls
+  onwin(){
+    const box=el('div','clip');Object.assign(box.style,{left:'0',top:'0',width:SW+'px',height:SH+'px'});
+    const g=makeGirl(box,170);const card=makeCard();
+    const land=SH-WIN[1]-2;const xr=SW-(WIN[0]+WIN[2])+60;
+    Object.assign(g.G,{x:xr,y:SH+40});g.apply();
+    later(100,()=>g.tw({y:land},520,t=>t*t));
+    later(640,()=>{g.tw({scale:.92},90);voice.play().catch(()=>{})});
+    later(740,()=>g.tw({scale:1},260,back));
+    if(card)later(1000,()=>{const b=g.img.getBoundingClientRect();card.style.top=Math.max(TOP+10,b.top-20)+'px';card.style.left=Math.max(10,b.left-270)+'px';card.classList.add('show')});
+    leave=()=>{card&&card.classList.remove('show');g.tw({y:SH+60},350,t=>t*t);done()};
+    const fall=()=>{timers.forEach(clearTimeout);card&&card.classList.remove('show');
+      let vy=0,b=g.G.y,spin=(Math.random()<.5?-1:1)*6,n=0;
+      const id=setInterval(()=>{vy-=1.4;b+=vy;g.G.rot+=spin;
+        if(b<=BOTTOM+10){b=BOTTOM+10;vy=-vy*.45;spin*=.5;n++;if(n>2||Math.abs(vy)<2){clearInterval(id);g.tw({rot:0},300,back);later(1400,()=>{g.tw({y:-260},400);done()})}}
+        g.G.y=b;g.apply()},16)};
+    draggable(g,{onClick:()=>leave(),onFling:fall});
+  },
+  // floats up slowly with "Join the meeting" on the balloon
+  balloon(){
+    const b=el('div','balloon');b.innerHTML='<img src="art/balloon.png" alt=""><div class="say"></div>';
+    b.querySelector('.say').textContent=LINK?'Join the meeting':(TEXT||'Hello!').slice(0,40);hitEls.add(b);
+    let y=-560;const to=SH-600,t0=performance.now();b.style.right='140px';
+    const id=setInterval(()=>{const t=performance.now()-t0,p=Math.min(1,t/6000);y=-560+(to+560)*(1-Math.pow(1-p,2));
+      b.style.bottom=y+'px';b.style.transform=`translateX(${Math.sin(t/900)*14}px) rotate(${Math.sin(t/1100)*4}deg)`},16);timers.push(id);
+    later(2500,()=>voice.play().catch(()=>{}));
+    leave=()=>{clearInterval(id);const from=y,s=performance.now();const up=setInterval(()=>{const p=Math.min(1,(performance.now()-s)/1400);b.style.bottom=(from+(SH+200-from)*p*p)+'px';if(p>=1){clearInterval(up);done()}},16)};
+    b.addEventListener('click',()=>{openLink();leave()});
+  }
+};
+post({type:'style',style,outfit});
+scenes[style]();
+// motivation and scolding leave on their own a little after the recording ends
+if(mode&&mode.auto)voice.addEventListener('ended',()=>later(1500,()=>leave()));
+</script>
+</body></html>

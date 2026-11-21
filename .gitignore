@@ -1,0 +1,5 @@
+node_modules/
+dist/
+
+# Real desktop screenshot captured during testing — leaks local file names
+verification/desktop-composite-shout.png
